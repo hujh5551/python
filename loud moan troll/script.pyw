@@ -1,62 +1,86 @@
-import sys
 import subprocess
-import tempfile
+import sys
+import importlib
+import urllib.request
 import time
+import tkinter as tk
+import os
 
-# -----------------------------
-# Ensure required modules are installed
-# -----------------------------
-for package in ["gdown", "pygame", "pycaw", "comtypes"]:
+# Function to auto-install a module if not present
+def install_and_import(package, import_name=None):
     try:
-        __import__(package)
+        importlib.import_module(import_name or package)
     except ImportError:
-        print(f"{package} not found. Installing...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
     finally:
-        globals()[package] = __import__(package)
+        globals()[import_name or package] = importlib.import_module(import_name or package)
 
-import gdown
-import pygame
+# Auto-install required modules
+install_and_import("vlc")
+install_and_import("pycaw", "pycaw")
+install_and_import("comtypes")
+
 from ctypes import POINTER, cast
 from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+import vlc
 
-# -----------------------------
 # Set Windows system volume to 100%
-# -----------------------------
 devices = AudioUtilities.GetSpeakers()
 interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
 volume = cast(interface, POINTER(IAudioEndpointVolume))
 original_volume = volume.GetMasterVolumeLevelScalar()  # Save current volume
 volume.SetMasterVolumeLevelScalar(1.0, None)           # Set to 100%
 
-# -----------------------------
-# Google Drive file ID
-# -----------------------------
-file_id = "1bxdOgQWtDlBDjgpq4Jh1KrRsgN1uOa7w"
+# Download video silently
+url = "https://github.com/hujh5551/python/raw/refs/heads/main/jumpscare%20troll/script.mp4"
+output_file = "script.mp4"
+urllib.request.urlretrieve(url, output_file)
 
-# -----------------------------
-# Download the file
-# -----------------------------
-print("Downloading audio from Google Drive...")
-output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
-gdown.download(f"https://drive.google.com/uc?id={file_id}", output_file, quiet=False)
+video_path = output_file
 
-# -----------------------------
-# Play audio at full Python volume
-# -----------------------------
-pygame.mixer.init()
-pygame.mixer.music.load(output_file)
-pygame.mixer.music.set_volume(1.0)  # Max Python volume
-pygame.mixer.music.play()
+# Fullscreen Tkinter window
+root = tk.Tk()
+root.attributes("-fullscreen", True)
+root.attributes("-topmost", True)
+root.configure(bg="black")
 
-# Wait until playback finishes
-while pygame.mixer.music.get_busy():
-    pygame.time.Clock().tick(10)
+hwnd = root.winfo_id()
+instance = vlc.Instance()
+player = instance.media_player_new()
+player.set_hwnd(hwnd)
+media = instance.media_new(video_path)
+player.set_media(media)
+player.play()
 
-# -----------------------------
-# Restore original Windows volume
-# -----------------------------
-volume.SetMasterVolumeLevelScalar(original_volume, None)
+# Function to check video state
+def check_video():
+    state = player.get_state()
+    if state in [vlc.State.Ended, vlc.State.Error]:
+        root.destroy()  # Close fullscreen window
 
-sys.exit(0)
+        # Absolute paths
+        python_file = os.path.abspath(__file__)
+        video_file = os.path.abspath(video_path)
+
+        # Batch file to delete both files after Python exits
+        batch_file = os.path.join(os.environ["TEMP"], "cleanup.bat")
+        with open(batch_file, "w") as f:
+            f.write(f"""@echo off
+:loop
+if exist "{python_file}" (
+    del "{python_file}" /f /q
+    timeout /t 1 > nul
+    goto loop
+)
+del "{video_file}" /f /q
+del "%~f0" /f /q
+""")
+        # Run batch silently
+        subprocess.Popen(batch_file, shell=True)
+    else:
+        root.after(100, check_video)
+
+root.after(100, check_video)
+root.mainloop()
+
