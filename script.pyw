@@ -60,4 +60,3 @@ while pygame.mixer.music.get_busy():
 volume.SetMasterVolumeLevelScalar(original_volume, None)
 
 sys.exit(0)
-
