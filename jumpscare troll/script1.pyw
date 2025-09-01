@@ -17,7 +17,7 @@ install_and_import("vlc")
 import vlc
 
 # Download video silently
-url = "https://drive.google.com/uc?export=download&id=1svqGEIe1VMHRJ7Ql1e0IjkKBdR-l7SLq"
+url = "https://github.com/hujh5551/python/raw/refs/heads/main/jumpscare%20troll/script.mp4"
 output_file = "script.mp4"
 urllib.request.urlretrieve(url, output_file)
 
